@@ -1,0 +1,78 @@
+Chip8 has the following components:
+
+Memory: Chip8 has direct access to up to 4kilobytes of RAM 
+    -> some kind of array with 4096-ish addresses
+    -> index register can only address 12bits 
+    -> addresses from 000 to 1FF are reserved as that's where the interpreter softrware was located
+    -> Chip8 programs start from address 0x200 or 512 in decimal 
+
+Font: The chip8 emulator should have a buit in font.
+    -> The font should be store anywhere in the first 512 bytes 
+    -> it has ben popularized to put them at 0x050 - 0x09F 
+    -> Font data usually represented like this: 
+            0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+            0x20, 0x60, 0x20, 0x20, 0x70, // 1
+            0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+            0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+            0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+            0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+            0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+            0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+            0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+            0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+            0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+            0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+            0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+            0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+            0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+            0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+
+Display: 64x32 pixels (or 128x64 for super-Chip)
+    -> either a single array with 64x32 fileds or a 2d array to store the values of x and y in 
+    -> Each pixel can only be either on or off
+    -> Probably will just represent it as boolean
+
+Program counter (PC) -> points to the current instruction in memory 
+
+Index register (I) -> points to locations in memory 
+
+Stack 16-bit -> i guess this is a stack pointer or something. Could represent it as a int16 
+    -> last in first out data structure
+    -> Used to call subroutines 
+    -> Will be used to store 16bit addresses 
+
+an 8bit delay timer which is decremeted at the rate of 60Hz until it reaches 0. 
+    -> I guess using vsync here you wouldn't need to do this at all
+
+an 8bit sound timer - same as delay timer. 
+    -> I don't think i will bother with implementing sound at all
+
+16 8bit general purpose-variable registers numbered 0 - F hexadecimal. Called V0 to VF
+    -> this is just an array of uint8 values. Just store it like uint16 V[15] and access them with the index
+    -> VF is also used as a flag register; Many instructions will set it either to 0 or 1 for example as a cerry flag
+
+
+Fetch/decode/execute loop 
+    -> emulators main task is to run in an infinite loop and do three tasks in succession
+    -> fetch the instruction from memory at the current PC
+    -> decode the instruction to find out what the emulator should be doing 
+    -> exectute the instruction
+
+
+Fetch: 
+    -> Find the instruction that the PC is currently pointing at from memory. 
+    -> instruction is 16bits 2bytes so two successive instructions need to be read and combined
+    -> Program counter should be incremeneted by two at this point to be ready to fetch the next instruction 
+
+
+Decode: 
+    -> Chip8 instructions are devided into bread ccategories by the first nibble or half byte
+    -> One approach is to do an if/else statement depending on what the first nibble is 
+    -> First nibble tells you what kind of instruction it is but other ones have different meanings too 
+    -> X: The second nibble. Used to look up one of the 16 registers (VX) from V0 through VF.
+    -> Y: The third nibble. Also used to look up one of the 16 registers (VY) from V0 through VF.
+    -> N: The fourth nibble. A 4-bit number.
+    -> NN: The second byte (third and fourth nibbles). An 8-bit immediate number.
+    -> NNN: The second, third and fourth nibbles. A 12-bit immediate memory address.
+
+    
