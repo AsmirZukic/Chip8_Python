@@ -4,12 +4,19 @@ import numpy as np
 np.set_printoptions(threshold=sys.maxsize)
 
 class Chip8: 
+    MEMORY_SIZE = 4096
+    VIDEO_WIDTH = 64
+    VIDEO_HEIGHT = 32
+    VIDEO_SIZE = VIDEO_WIDTH * VIDEO_HEIGHT
+    FONTSET_START_ADDRESS = 0x50
+    ROM_START_ADDRESS = 0x200
+    
     def __init__(self):
-        self.memory = np.zeros( 4096 , dtype=np.uint8 )
-        self.video_memory = np.zeros( 32*64, dtype=np.bool )
-        self.registers = np.zeros( 16, dtype=np.uint8 )
+        self.memory = np.zeros(self.MEMORY_SIZE, dtype=np.uint16)
+        self.video_memory = np.zeros(self.VIDEO_SIZE, dtype=np.bool_)
+        self.registers = np.zeros(16, dtype=np.uint8)
         self.stack = []
-        self.program_counter = 0x200
+        self.program_counter = self.ROM_START_ADDRESS
         self.stack_counter = 0
         self.index_register = 0 
         self.delay_counter = 0
@@ -32,73 +39,67 @@ class Chip8:
             0xF0, 0x80, 0xF0, 0x80, 0xF0, # E
             0xF0, 0x80, 0xF0, 0x80, 0x80  # F
         ]
+        self.opcode_map = {
+            0x0: self.handle_0x0,
+            0x1: self.op1NNN,
+            0x6: self.op6xnn,
+            0xA: self.opAnnn,
+            0xD: self.opDxyn,
+        }
 
     def _load_fontset(self): 
-        for i in range(len(self.fontset)):
-            self.memory[0x50 + i] = self.fontset[i]
+        self.memory[self.FONTSET_START_ADDRESS:self.FONTSET_START_ADDRESS + len(self.fontset)] = self.fontset
 
     def _load_rom_data(self, rom_path): 
-        index = 0x200
         with open(rom_path, "rb") as file: 
-            while True:
-                bit = file.read(1)
-                if not bit: 
-                    break 
-                self.memory[index] = ord(bit)  # Store byte value in memory
-                index += 1
+            rom_data = file.read()
+            start = self.ROM_START_ADDRESS
+            self.memory[start:start + len(rom_data)] = np.frombuffer(rom_data, dtype=np.uint8)
 
-    def load_rom(self): 
+    def load_rom(self, rom_path): 
         self._load_fontset()
-        self._load_rom_data(sys.argv[1])
-        print(self.memory)
+        self._load_rom_data(rom_path)
 
     def fetch(self): 
-        #Instructions are two bytes but the memory only stores 8bits (1 byte)
-        #We need to fetch the two bytes to get the full instruction and then combine them together
-        first_byte = self.memory[self.program_counter] 
+        if self.program_counter + 1 >= self.MEMORY_SIZE:
+            raise IndexError("Program counter out of bounds.")
+        first_byte = self.memory[self.program_counter]
         second_byte = self.memory[self.program_counter + 1]
-
-        instruction = (first_byte << 8) | second_byte
-
-        #We're going to increment the program counter by 2 here
         self.program_counter += 2
-
-        return instruction
+        return (first_byte << 8) | second_byte
     
     def decode_and_execute(self):
         instruction = self.fetch()
-        first_nibble = instruction >> 12
+        opcode = (instruction & 0xF000) >> 12
+        if opcode in self.opcode_map:
+            self.opcode_map[opcode](instruction)
+        else:
+            raise ValueError(f"Unknown opcode: {hex(opcode)}")
 
-        if first_nibble == 0x0:
-            if instruction == 0x00E0:
-                self.op00E0()
-            # Add other 0x0--- opcodes if needed
-        elif first_nibble == 0x6:
-            self.op6xnn(instruction)
-        elif first_nibble == 0xA:
-            self.opAnnn(instruction)
-        elif first_nibble == 0xD:
-            self.opDxyn(instruction)
-        # Add other opcode handlers as needed
+    def run(self):
+        try:
+            while True:
+                self.decode_and_execute()
+        except (IndexError, ValueError) as e:
+            print(f"Error encountered: {e}")
+            # Handle error or exit
 
+    def handle_0x0(self, instruction):
+        if instruction == 0x00E0:
+            self.op00E0()
+        # Handle other 0x0 opcodes if necessary
 
-    #Clear screen
     def op00E0(self):
-        self.video_memory = np.zeros( 32*64, dtype=np.bool )
+        self.video_memory = np.zeros(self.VIDEO_SIZE, dtype=np.bool_)
 
     def op6xnn(self, instruction):
-        #Get X
         X = (instruction & 0x0F00) >> 8
-        #Get NN
         NN = instruction & 0x00FF
-        #set the value of Vx to be NN 
         self.registers[X] = NN 
 
-    #Set index register to value NNN
     def opAnnn(self, instruction):
         self.index_register = instruction & 0x0FFF
 
-    #Jump to NNN
     def op1NNN(self, instruction): 
         self.program_counter = instruction & 0x0FFF
 
@@ -111,15 +112,18 @@ class Chip8:
             sprite = self.memory[self.index_register + row]
             for col in range(8):
                 if (sprite & (0x80 >> col)) != 0:
-                    vx = (x + col) % 64
-                    vy = (y + row) % 32
-                    if self.video_memory[vy, vx]:
+                    vx = (x + col) % self.VIDEO_WIDTH
+                    vy = (y + row) % self.VIDEO_HEIGHT
+                    index = vy * self.VIDEO_WIDTH + vx
+                    if self.video_memory[index]:
                         self.registers[0xF] = 1
-                    self.video_memory[vy, vx] ^= True
-        
+                    self.video_memory[index] ^= True
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python chip8.py <path_to_rom>")
+        sys.exit(1)
+    
     emulator = Chip8()
-    emulator.load_rom()
-    while True:
-        emulator.decode_and_execute()
+    emulator.load_rom(sys.argv[1])
+    emulator.run()
