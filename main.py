@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+import pygame 
 
 np.set_printoptions(threshold=sys.maxsize)
 
@@ -13,7 +14,7 @@ class Chip8:
     
     def __init__(self):
         self.memory = np.zeros(self.MEMORY_SIZE, dtype=np.uint16)
-        self.video_memory = np.zeros(self.VIDEO_SIZE, dtype=np.bool_)
+        self.video_memory = np.zeros(shape=[self.VIDEO_WIDTH, self.VIDEO_HEIGHT], dtype=np.bool_)
         self.registers = np.zeros(16, dtype=np.uint8)
         self.stack = []
         self.program_counter = self.ROM_START_ADDRESS
@@ -43,6 +44,7 @@ class Chip8:
             0x0: self.handle_0x0,
             0x1: self.op1NNN,
             0x6: self.op6xnn,
+            0x7: self.op7XNN,
             0xA: self.opAnnn,
             0xD: self.opDxyn,
         }
@@ -73,6 +75,7 @@ class Chip8:
         opcode = (instruction & 0xF000) >> 12
         if opcode in self.opcode_map:
             self.opcode_map[opcode](instruction)
+            return self.get_video_memory()
         else:
             raise ValueError(f"Unknown opcode: {hex(opcode)}")
 
@@ -80,28 +83,100 @@ class Chip8:
         try:
             while True:
                 self.decode_and_execute()
+                
         except (IndexError, ValueError) as e:
             print(f"Error encountered: {e}")
             # Handle error or exit
 
+    def get_X(self, instruction):
+        return (instruction & 0x0F00) >> 8
+    
+    def get_Y(self, instruction):
+        return (instruction & 0x00F0) >> 4
+    
+    def get_NN(self, instruction):
+        return instruction & 0x00FF
+    
+    def get_NNN(self, instruction):
+        return instruction & 0x0FFF
+
     def handle_0x0(self, instruction):
         if instruction == 0x00E0:
             self.op00E0()
-        # Handle other 0x0 opcodes if necessary
+        elif instruction == 0x00EE:
+            self.op00EE()
 
     def op00E0(self):
-        self.video_memory = np.zeros(self.VIDEO_SIZE, dtype=np.bool_)
+        self.video_memory.fill(0)
+
+    def op3XNN(self, instruction):
+        if( self.registers[self.get_X(instruction)] == self.get_NN(instruction)):
+            self.program_counter +=2
+        else:
+            pass
+    def op4XNN(self, instruction):
+        if( self.registers[self.get_X(instruction)] != self.get_NN(instruction)):
+            self.program_counter +=2
+        else:
+            pass
+
+    def op5XY0(self, instruction):
+        if( self.registers[self.get_X(instruction)] == self.registers[self.get_Y(instruction)]):
+            self.program_counter +=2
+        else:
+            pass
+
+    def op9XY0(self, instruction):
+        if( self.registers[self.get_X(instruction)] != self.registers[self.get_Y(instruction)]):
+            self.program_counter +=2
+        else:
+            pass
+
 
     def op6xnn(self, instruction):
         X = (instruction & 0x0F00) >> 8
         NN = instruction & 0x00FF
         self.registers[X] = NN 
 
+    def op7XNN(self, instruction):
+        X = (instruction & 0x0F00) >> 8 
+        NN = instruction & 0x00FF
+
+        self.registers[X] += NN 
+
     def opAnnn(self, instruction):
         self.index_register = instruction & 0x0FFF
 
     def op1NNN(self, instruction): 
         self.program_counter = instruction & 0x0FFF
+
+    def op2NNN(self, instruction):
+        self.stack.append(self.program_counter)
+        self.program_counter = instruction & 0x0FFF
+
+    def op00EE(self):
+        self.program_counter = self.stack.pop()
+
+    def op8XY0(self, instruction):
+        self.registers[self.get_X(instruction)] = self.registers[self.get_Y(instruction)]
+
+    def op8XY1(self, instruction):
+        self.registers[self.get_X(instruction)] |= self.registers[self.get_Y(instruction)]
+
+    def op8XY2(self, instruction):
+        self.registers[self.get_X(instruction)] &= self.registers[self.get_Y(instruction)]
+
+    def op8XY3(self, instruction):
+        self.registers[self.get_X(instruction)] ^= self.registers[self.get_Y(instruction)]
+
+    def op8XY4(self, instruction):
+        self.registers[self.get_X(instruction)] += self.registers[self.get_Y(instruction)]
+
+    def op8XY5(self, instruction):
+        self.registers[self.get_X(instruction)] -= self.registers[self.get_Y(instruction)]
+    
+    def op8XY7(self, instruction):
+        self.registers[self.get_X(instruction)] = self.registers[self.get_Y(instruction)] - self.registers[self.get_X(instruction)]
 
     def opDxyn(self, instruction):
         x = self.registers[(instruction & 0x0F00) >> 8]
@@ -114,10 +189,12 @@ class Chip8:
                 if (sprite & (0x80 >> col)) != 0:
                     vx = (x + col) % self.VIDEO_WIDTH
                     vy = (y + row) % self.VIDEO_HEIGHT
-                    index = vy * self.VIDEO_WIDTH + vx
-                    if self.video_memory[index]:
+                    if self.video_memory[vx,vy]:
                         self.registers[0xF] = 1
-                    self.video_memory[index] ^= True
+                    self.video_memory[vx,vy] ^= True
+
+    def get_video_memory(self):
+        return (self.video_memory.astype(np.uint8)) * 255
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -126,4 +203,22 @@ if __name__ == "__main__":
     
     emulator = Chip8()
     emulator.load_rom(sys.argv[1])
-    emulator.run()
+
+    pygame.init()
+    display = pygame.display.set_mode((640, 320))
+    pygame.display.set_caption("Chip8")
+    running = True
+    while running:
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                    running = False
+
+        video_memory = emulator.decode_and_execute()
+        video_surface = pygame.surfarray.make_surface(video_memory)
+        scaled_surface = pygame.transform.scale(video_surface, display.get_size())
+        display.blit(scaled_surface, (0, 0))
+
+        pygame.display.update()
+    
+    pygame.quit()
