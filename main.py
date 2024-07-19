@@ -43,7 +43,10 @@ class Chip8:
         ]
 
         self.opcode_map = {
-            0x0: self.handle_0x0,
+            0x0: {
+                0x00E0: self.op00E0,
+                0x00EE: self.op00EE
+            },
             0x1: self.op1NNN,
             0x2: self.op2NNN,
             0x3: self.op3XNN,
@@ -51,12 +54,28 @@ class Chip8:
             0x5: self.op5XY0,
             0x6: self.op6xnn,
             0x7: self.op7XNN,
-            0x8: self.handle_0x8,
+            0x8: {
+                0x0: self.op8XY0,
+                0x1: self.op8XY1,
+                0x2: self.op8XY2,
+                0x3: self.op8XY3,
+                0x4: self.op8XY4,
+                0x5: self.op8XY5,
+                0x6: self.op8XY6,
+                0x7: self.op8XY7,
+                0xE: self.op8XYE
+            },
             0x9: self.op9XY0,
             0xA: self.opAnnn,
             0xD: self.opDxyn,
-            0xF: self.handle_0xF,
+            0xF: {
+                0x65: self.opFX65,
+                0x55: self.opFX55,
+                0x33: self.opFX33,
+                0x1E: self.opFX1E
+            }
         }
+
 
     def _load_fontset(self):
         self.memory[
@@ -86,11 +105,34 @@ class Chip8:
     def decode_and_execute(self):
         instruction = self.fetch()
         opcode = (instruction & 0xF000) >> 12
-        if opcode in self.opcode_map:
-            self.opcode_map[opcode](instruction)
-            return self.get_video_memory()
+        sub_opcode = instruction & 0x00FF
+        sub_opcode_8 = instruction & 0x000F  # For 0x8 instructions
+
+        # Retrieve the handler for the main opcode
+        handler = self.opcode_map.get(opcode)
+        
+        if handler:
+            if isinstance(handler, dict):
+                # Handle nested dictionary for specific opcodes
+                if opcode == 0x8:
+                    # Special handling for 0x8 instructions
+                    sub_handler = handler.get(sub_opcode_8, lambda instr: print(f"Unknown 0x8 sub-opcode: {hex(sub_opcode_8)}"))
+                    sub_handler(instruction)  # Call with instruction
+                elif opcode == 0xF:
+                    # Special handling for 0xF instructions
+                    sub_handler = handler.get(sub_opcode, lambda instr: print(f"Unknown 0xF sub-opcode: {hex(sub_opcode)}"))
+                    sub_handler(instruction)  # Call with instruction
+                else:
+                    # Handle other nested dictionaries
+                    sub_handler = handler.get(sub_opcode, lambda instr: print(f"Unknown sub-opcode: {hex(sub_opcode)}"))
+                    sub_handler(instruction)  # Call with instruction
+            else:
+                # Direct function call with instruction
+                handler(instruction)
         else:
-            raise ValueError(f"Unknown opcode: {hex(opcode)}")
+            print(f"Unknown opcode: {hex(opcode)}")
+
+        return self.get_video_memory()
 
     def run(self):
         try:
@@ -113,47 +155,7 @@ class Chip8:
     def get_NNN(self, instruction):
         return instruction & 0x0FFF
 
-    def handle_0x0(self, instruction):
-        if instruction == 0x00E0:
-            self.op00E0()
-        elif instruction == 0x00EE:
-            self.op00EE()
-
-    def handle_0x8(self, instruction):
-        if instruction & 0x0F == 0x0:
-            self.op8XY0(instruction)
-        elif instruction & 0x0F == 0x1:
-            self.op8XY1(instruction)
-        elif instruction & 0x0F == 0x2:
-            self.op8XY2(instruction)
-        elif instruction & 0x0F == 0x3:
-            self.op8XY3(instruction)
-        elif instruction & 0x0F == 0x4:
-            self.op8XY4(instruction)
-        elif instruction & 0x0F == 0x5:
-            self.op8XY5(instruction)
-        elif instruction & 0x0F == 0x6:
-            self.op8XY6(instruction)
-        elif instruction & 0x0F == 0x7:
-            self.op8XY7(instruction)
-        elif instruction & 0x0F == 0xE:
-            self.op8XYE(instruction)
-        else:
-            pass
-
-    def handle_0xF(self, instruction):
-        if instruction & 0xFF == 0x65:
-            self.opFX65(instruction)
-        elif instruction & 0xFF == 0x55:
-            self.opFX55(instruction)
-        elif instruction & 0xFF == 0x33:
-            self.opFX33(instruction)
-        elif instruction & 0xFF == 0x1E:
-            self.opFX1E(instruction)
-        else:
-            pass
-
-    def op00E0(self):
+    def op00E0(self, instruction):
         self.video_memory.fill(0)
 
     def op3XNN(self, instruction):
@@ -169,19 +171,13 @@ class Chip8:
             pass
 
     def op5XY0(self, instruction):
-        if (
-            self.registers[self.get_X(instruction)]
-            == self.registers[self.get_Y(instruction)]
-        ):
+        if (self.registers[self.get_X(instruction)] == self.registers[self.get_Y(instruction)]):
             self.program_counter += 2
         else:
             pass
 
     def op9XY0(self, instruction):
-        if (
-            self.registers[self.get_X(instruction)]
-            != self.registers[self.get_Y(instruction)]
-        ):
+        if (self.registers[self.get_X(instruction)] != self.registers[self.get_Y(instruction)]):
             self.program_counter += 2
         else:
             pass
@@ -207,71 +203,74 @@ class Chip8:
         self.stack.append(self.program_counter)
         self.program_counter = instruction & 0x0FFF
 
-    def op00EE(self):
+    def op00EE(self, instruction):
         self.program_counter = self.stack.pop()
 
     def op8XY0(self, instruction):
-        self.registers[self.get_X(instruction)] = self.registers[
-            self.get_Y(instruction)
-        ]
+        self.registers[self.get_X(instruction)] = self.registers[self.get_Y(instruction)]
 
     def op8XY1(self, instruction):
-        self.registers[self.get_X(instruction)] |= self.registers[
-            self.get_Y(instruction)
-        ]
+        self.registers[self.get_X(instruction)] |= self.registers[self.get_Y(instruction)]
 
     def op8XY2(self, instruction):
-        self.registers[self.get_X(instruction)] &= self.registers[
-            self.get_Y(instruction)
-        ]
+        self.registers[self.get_X(instruction)] &= self.registers[self.get_Y(instruction)]
 
     def op8XY3(self, instruction):
-        self.registers[self.get_X(instruction)] ^= self.registers[
-            self.get_Y(instruction)
-        ]
+        self.registers[self.get_X(instruction)] ^= self.registers[self.get_Y(instruction)]
 
     def op8XY4(self, instruction):
-        self.registers[self.get_X(instruction)] += self.registers[
-            self.get_Y(instruction)
-        ]
+        x = self.get_X(instruction)
+        y = self.get_Y(instruction)
+        
+        # Cast the registers to uint16 to handle overflow properly
+        vx = np.uint16(self.registers[x])
+        vy = np.uint16(self.registers[y])
+        
+        sum_value = vx + vy
+    
+        # Store only the lower 8 bits of the sum in VX
+        self.registers[x] = sum_value & 0xFF
+
+        self.registers[0xF] = 1 if sum_value > 0xFF else 0
+        
 
     def op8XY5(self, instruction):
-        self.registers[self.get_X(instruction)] -= self.registers[
-            self.get_Y(instruction)
-        ]
+        if self.registers[self.get_X(instruction)] < self.registers[self.get_Y(instruction)] :
+            self.registers[self.get_X(instruction)] -= self.registers[self.get_Y(instruction)]
+            self.registers[0xF] = 0
+        else:
+            self.registers[self.get_X(instruction)] -= self.registers[self.get_Y(instruction)]
+            self.registers[0xF] = 1
 
     def op8XY6(self, instruction):
-        X = self.get_X(instruction)
-        Y = self.get_Y(instruction)
-
-        if self.registers[X] & 0x01:
+        original_x = self.registers[self.get_X(instruction)]
+        self.registers[self.get_X(instruction)] = self.registers[self.get_X(instruction)] >> 1
+        
+        if original_x & 0x01:
             self.registers[0xF] = 1
         else:
             self.registers[0xF] = 0
 
-        self.registers[X] = self.registers[X] >> 1
-
     def op8XY7(self, instruction):
         X = self.get_X(instruction)
         Y = self.get_Y(instruction)
+
+        self.registers[X] = self.registers[Y] - self.registers[X]
 
         if self.registers[Y] >= self.registers[X]:
             self.registers[0xF] = 1
         else:
             self.registers[0xF] = 0
 
-        self.registers[X] = (self.registers[Y] - self.registers[X]) & 0xFF
-
     def op8XYE(self, instruction):
-        X = self.get_X(instruction)
-        Y = self.get_Y(instruction)
+        original_x = self.registers[self.get_X(instruction)]
 
-        if self.registers[X] & 0x80:
+        self.registers[self.get_X(instruction)] = (self.registers[self.get_X(instruction)] << 1) & 0xFF
+
+        if original_x & 0x80:
             self.registers[0xF] = 1
         else:
             self.registers[0xF] = 0
-
-        self.registers[X] = (self.registers[X] << 1) & 0xFF
 
     def opDxyn(self, instruction):
         x = self.registers[(instruction & 0x0F00) >> 8]
