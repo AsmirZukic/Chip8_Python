@@ -1,0 +1,545 @@
+[
+    {
+        "name": "1NNN - Jump to Address",
+        "initial": {
+            "pc": "0x200"
+        },
+        "opcode": "0x1ABC",
+        "expected": {
+            "pc": "0xABC"
+        }
+    },
+    {
+        "name": "00E0 - Clear Screen",
+        "initial": {
+            "vram": "FILL:1"
+        },
+        "opcode": "0x00E0",
+        "expected": {
+            "vram": "FILL:0"
+        }
+    },
+    {
+        "name": "6XNN - Set Register V2 = 0xFF",
+        "initial": {},
+        "opcode": "0x62FF",
+        "expected": {
+            "registers": {
+                "2": 255
+            }
+        }
+    },
+    {
+        "name": "7XNN - Add to Register V2 (10+5)",
+        "initial": {
+            "registers": {
+                "2": 10
+            }
+        },
+        "opcode": "0x7205",
+        "expected": {
+            "registers": {
+                "2": 15
+            }
+        }
+    },
+    {
+        "name": "7XNN - Add to Register Overflow (255+2)",
+        "initial": {
+            "registers": {
+                "2": 255
+            }
+        },
+        "opcode": "0x7202",
+        "expected": {
+            "registers": {
+                "2": 1
+            }
+        }
+    },
+    {
+        "name": "8XY0 - Set V1 = V2",
+        "initial": {
+            "registers": {
+                "1": 0,
+                "2": "0xAB"
+            }
+        },
+        "opcode": "0x8120",
+        "expected": {
+            "registers": {
+                "1": "0xAB"
+            }
+        }
+    },
+    {
+        "name": "8XY4 - Add V1 + V2 (No Carry)",
+        "initial": {
+            "registers": {
+                "1": 10,
+                "2": 20,
+                "15": 1
+            }
+        },
+        "opcode": "0x8124",
+        "expected": {
+            "registers": {
+                "1": 30,
+                "15": 0
+            }
+        }
+    },
+    {
+        "name": "8XY4 - Add V1 + V2 (Carry)",
+        "initial": {
+            "registers": {
+                "1": 250,
+                "2": 10,
+                "15": 0
+            }
+        },
+        "opcode": "0x8124",
+        "expected": {
+            "registers": {
+                "1": 4,
+                "15": 1
+            }
+        }
+    },
+    {
+        "name": "8XY5 - Sub V1 - V2 (No Borrow)",
+        "initial": {
+            "registers": {
+                "1": 20,
+                "2": 10,
+                "15": 0
+            }
+        },
+        "opcode": "0x8125",
+        "expected": {
+            "registers": {
+                "1": 10,
+                "15": 1
+            }
+        }
+    },
+    {
+        "name": "8XY5 - Sub V1 - V2 (Borrow)",
+        "initial": {
+            "registers": {
+                "1": 10,
+                "2": 20,
+                "15": 1
+            }
+        },
+        "opcode": "0x8125",
+        "expected": {
+            "registers": {
+                "1": 246,
+                "15": 0
+            }
+        }
+    },
+    {
+        "name": "DXYN - Draw Sprite (No Collision)",
+        "initial": {
+            "registers": {
+                "0": 0,
+                "1": 0
+            },
+            "index": "0x300",
+            "memory": {
+                "0x300": [
+                    255,
+                    255
+                ]
+            }
+        },
+        "opcode": "0xD012",
+        "expected": {
+            "registers": {
+                "15": 0
+            }
+        }
+    },
+    {
+        "name": "DXYN - Draw Sprite (Collision)",
+        "initial": {
+            "registers": {
+                "0": 0,
+                "1": 0
+            },
+            "index": "0x300",
+            "memory": {
+                "0x300": [
+                    255
+                ]
+            },
+            "vram": "FILL:1"
+        },
+        "opcode": "0xD011",
+        "expected": {
+            "registers": {
+                "15": 1
+            }
+        }
+    },
+    {
+        "name": "ANNN - Set Index",
+        "initial": {
+            "index": 0
+        },
+        "opcode": "0xA123",
+        "expected": {
+            "index": "0x123"
+        }
+    },
+    {
+        "name": "BNNN - Jump + V0",
+        "initial": {
+            "registers": {
+                "0": "0x20"
+            }
+        },
+        "opcode": "0xB100",
+        "expected": {
+            "pc": "0x120"
+        }
+    },
+    {
+        "name": "FX1E - Add Index",
+        "initial": {
+            "index": "0x10",
+            "registers": {
+                "2": "0x05"
+            }
+        },
+        "opcode": "0xF21E",
+        "expected": {
+            "index": "0x15"
+        }
+    },
+    {
+        "name": "FX55 - Store Registers",
+        "initial": {
+            "index": "0x400",
+            "registers": {
+                "0": 10,
+                "1": 20
+            }
+        },
+        "opcode": "0xF155",
+        "expected": {
+            "memory": {
+                "0x400": [
+                    10,
+                    20
+                ]
+            }
+        }
+    },
+    {
+        "name": "FX65 - Load Registers",
+        "initial": {
+            "index": "0x400",
+            "memory": {
+                "0x400": [
+                    30,
+                    40
+                ]
+            }
+        },
+        "opcode": "0xF165",
+        "expected": {
+            "registers": {
+                "0": 30,
+                "1": 40
+            }
+        }
+    },
+    {
+        "name": "FX33 - Binary Coded Decimal",
+        "initial": {
+            "index": "0x400",
+            "registers": {
+                "0": 123
+            }
+        },
+        "opcode": "0xF033",
+        "expected": {
+            "memory": {
+                "0x400": [
+                    1,
+                    2,
+                    3
+                ]
+            }
+        }
+    },
+    {
+        "name": "2NNN & 00EE - Call and Return",
+        "initial": {
+            "pc": "0x200",
+            "sp": 0
+        },
+        "opcode": "0x2400",
+        "expected": {
+            "pc": "0x400",
+            "stack": [
+                "0x202"
+            ]
+        }
+    },
+    {
+        "name": "00EE - Return",
+        "initial": {
+            "pc": "0x400",
+            "stack": [
+                "0x202"
+            ]
+        },
+        "opcode": "0x00EE",
+        "expected": {
+            "pc": "0x202",
+            "stack": []
+        }
+    },
+    {
+        "name": "3XNN - Skip Equal (True)",
+        "initial": {
+            "pc": "0x200",
+            "registers": {
+                "0": "0x55"
+            }
+        },
+        "opcode": "0x3055",
+        "expected": {
+            "pc": "0x204"
+        }
+    },
+    {
+        "name": "3XNN - Skip Equal (False)",
+        "initial": {
+            "pc": "0x200",
+            "registers": {
+                "0": "0x55"
+            }
+        },
+        "opcode": "0x3066",
+        "expected": {
+            "pc": "0x202"
+        }
+    },
+    {
+        "name": "4XNN - Skip Not Equal (True)",
+        "initial": {
+            "pc": "0x200",
+            "registers": {
+                "0": "0x55"
+            }
+        },
+        "opcode": "0x4066",
+        "expected": {
+            "pc": "0x204"
+        }
+    },
+    {
+        "name": "5XY0 - Skip Regs Equal (True)",
+        "initial": {
+            "pc": "0x200",
+            "registers": {
+                "0": "0xAA",
+                "1": "0xAA"
+            }
+        },
+        "opcode": "0x5010",
+        "expected": {
+            "pc": "0x204"
+        }
+    },
+    {
+        "name": "9XY0 - Skip Regs Not Equal (True)",
+        "initial": {
+            "pc": "0x200",
+            "registers": {
+                "0": "0xAA",
+                "1": "0xBB"
+            }
+        },
+        "opcode": "0x9010",
+        "expected": {
+            "pc": "0x204"
+        }
+    },
+    {
+        "name": "8XY1 - OR",
+        "initial": {
+            "registers": {
+                "0": "0x0F",
+                "1": "0xF0"
+            }
+        },
+        "opcode": "0x8011",
+        "expected": {
+            "registers": {
+                "0": "0xFF"
+            }
+        }
+    },
+    {
+        "name": "8XY2 - AND",
+        "initial": {
+            "registers": {
+                "0": "0x0F",
+                "1": "0xFF"
+            }
+        },
+        "opcode": "0x8012",
+        "expected": {
+            "registers": {
+                "0": "0x0F"
+            }
+        }
+    },
+    {
+        "name": "8XY3 - XOR",
+        "initial": {
+            "registers": {
+                "0": "0x0F",
+                "1": "0xFF"
+            }
+        },
+        "opcode": "0x8013",
+        "expected": {
+            "registers": {
+                "0": "0xF0"
+            }
+        }
+    },
+    {
+        "name": "8XY6 - SHR (Legacy Distinguish)",
+        "initial": {
+            "registers": {
+                "0": "0x00",
+                "1": "0x04"
+            }
+        },
+        "opcode": "0x8016",
+        "expected": {
+            "registers": {
+                "0": "0x02",
+                "15": 0
+            }
+        }
+    },
+    {
+        "name": "8XY6 - SHR (LSB=1)",
+        "initial": {
+            "registers": {
+                "0": "0x05"
+            }
+        },
+        "opcode": "0x8006",
+        "expected": {
+            "registers": {
+                "0": "0x02",
+                "15": 1
+            }
+        }
+    },
+    {
+        "name": "8XYE - SHL (MSB=1)",
+        "initial": {
+            "registers": {
+                "0": "0x80"
+            }
+        },
+        "opcode": "0x800E",
+        "expected": {
+            "registers": {
+                "0": "0x00",
+                "15": 1
+            }
+        }
+    },
+    {
+        "name": "8XY7 - SUBN (No Borrow)",
+        "initial": {
+            "registers": {
+                "0": "0x05",
+                "1": "0x10"
+            }
+        },
+        "opcode": "0x8017",
+        "expected": {
+            "registers": {
+                "0": "0x0B",
+                "15": 1
+            }
+        }
+    },
+    {
+        "name": "EX9E - Skip Key Pressed (True)",
+        "initial": {
+            "pc": "0x200",
+            "registers": {
+                "0": "0x5"
+            },
+            "keys": 32
+        },
+        "opcode": "0xE09E",
+        "expected": {
+            "pc": "0x204"
+        }
+    },
+    {
+        "name": "EXA1 - Skip Key Not Pressed (True)",
+        "initial": {
+            "pc": "0x200",
+            "registers": {
+                "0": "0x5"
+            },
+            "keys": 0
+        },
+        "opcode": "0xE0A1",
+        "expected": {
+            "pc": "0x204"
+        }
+    },
+    {
+        "name": "FX15 - Set Delay Timer",
+        "initial": {
+            "registers": {
+                "0": "0x20"
+            }
+        },
+        "opcode": "0xF015",
+        "expected": {
+            "delay_timer": 32
+        }
+    },
+    {
+        "name": "FX07 - Read Delay Timer",
+        "initial": {
+            "delay_timer": 32
+        },
+        "opcode": "0xF007",
+        "expected": {
+            "registers": {
+                "0": 32
+            }
+        }
+    },
+    {
+        "name": "FX29 - Set I to Sprite",
+        "initial": {
+            "registers": {
+                "0": 0
+            }
+        },
+        "opcode": "0xF029",
+        "expected": {
+            "index": "0x50"
+        }
+    }
+]

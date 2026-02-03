@@ -1,0 +1,23 @@
+[project]
+name = "chip8-python"
+version = "0.1.0"
+description = "A modern, test-driven Chip-8 emulator using functional core architecture and data-driven testing."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.4.2",
+    "pygame>=2.6.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[project.scripts]
+chip8 = "chip8.cli:main"
+
+[tool.uv]
+package = true
+
+
