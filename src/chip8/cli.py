@@ -1,8 +1,8 @@
 import sys
 import time
+import argparse
 from chip8.core.types import Chip8State
 from chip8.core.opcodes import execute_opcode
-from chip8.shell.window import PygameWindow
 
 # Clock speed: 500Hz
 CLOCK_SPEED = 500
@@ -41,18 +41,33 @@ def load_rom(state: Chip8State, path: str):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: uv run chip8 <rom>")
-        return
+    parser = argparse.ArgumentParser(description="Chip8 Emulator")
+    parser.add_argument("rom", help="Path to ROM file")
+    parser.add_argument("-p", "--perun", action="store_true", 
+                        help="Use Perun for rendering (streams to perun-client)")
+    parser.add_argument("--tcp", type=str, default="127.0.0.1:8080",
+                        help="Perun server TCP address (default: 127.0.0.1:8080)")
+    parser.add_argument("--unix", type=str, default=None,
+                        help="Perun server Unix socket path (overrides --tcp)")
+    parser.add_argument("--no-delta", action="store_true", help="Disable delta-frame optimization (send all frames)")
+    args = parser.parse_args()
 
-    rom_path = sys.argv[1]
+    rom_path = args.rom
     
     # 1. Init Core
     state = Chip8State()
     load_rom(state, rom_path)
     
     # 2. Init Shell
-    window = PygameWindow()
+    if args.perun:
+        from chip8.shell.perun_shell import PerunWindow
+        if args.unix:
+            window = PerunWindow(address=args.unix, use_tcp=False, delta_only=not args.no_delta)
+        else:
+            window = PerunWindow(address=args.tcp, use_tcp=True, delta_only=not args.no_delta)
+    else:
+        from chip8.shell.window import PygameWindow
+        window = PygameWindow()
     
     # 3. Game Loop
     running = True
@@ -91,9 +106,12 @@ def main():
                 
                 accumulator -= MS_PER_CYCLE
 
-            # Timers (60Hz)
-            # Timers (60Hz)
-            while timer_accumulator >= 1.0/60.0:
+            # Update timers (60Hz)
+            should_render = False
+            while timer_accumulator >= 1.0 / 60.0:
+                timer_accumulator -= 1.0 / 60.0
+                
+                # Decrement timers directly
                 if state.delay_timer > 0:
                     state.delay_timer -= 1
                 if state.sound_timer > 0:
@@ -102,11 +120,17 @@ def main():
                 # Audio Control
                 window.update_sound(state.sound_timer)
                 
-                timer_accumulator -= 1.0/60.0
-
-            # Render (Imperative Shell)
-            # We can cap render at 60Hz separately, but for now render every frame
-            window.render(state)
+                should_render = True
+            
+            if should_render:
+                window.render(state)
+            
+            # Sleep briefly when we have no work to do
+            # This prevents CPU spinning and allows I/O to be processed
+            # Without this sleep, the tight loop starves socket operations,
+            # causing severe input latency (7+ seconds)
+            if accumulator < MS_PER_CYCLE and timer_accumulator < 1.0 / 60.0:
+                time.sleep(0.001)  # 1ms sleep when idle
             
     except KeyboardInterrupt:
         pass
@@ -118,3 +142,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
